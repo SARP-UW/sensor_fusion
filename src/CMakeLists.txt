@@ -21,3 +21,10 @@ add_executable(sensor_fusion main.cpp)
 # Link the main executable against our core logic library.
 # This makes all functions from 'fusion_lib' available to 'sensor_fusion'.
 target_link_libraries(sensor_fusion PRIVATE fusion_lib)
+
+###################################
+# Synthetic Data Generator (Tool) #
+###################################
+
+# This is a standalone tool to create fake log files.
+add_executable(generate_data mainGenerator.cpp DataGenerator.cpp)
