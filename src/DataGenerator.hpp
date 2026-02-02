@@ -2,19 +2,20 @@
 
 #include <string>
 #include <vector>
-#include <random> // For generating noise
+#include <random>
 #include "SensorData.hpp"
 
+// DataGenerator Class: Generates synthetic flight data and writes to a binary file.
 class DataGenerator
 {
 public:
   // Config for our simulation.
   struct Config
   {
-    // Total simulation time in seconds.
-    double duration_sec = 30.0;
+    // Total simulation time (s).
+    double duration_sec = 60.0;
 
-    // Physics time step in seconds (100 Hz).
+    // Time step at 100 Hz (s).
     double dt_sec = 0.01;
     std::string output_filename = "synthetic_flight.bin";
   };
@@ -29,10 +30,10 @@ private:
 
   // Gaussian Noise Generators.
   std::default_random_engine generator_;
-  std::normal_distribution<double> noise_imu_acc_{0.0, 0.2};   // Mean 0, StdDev 0.2 m/s^2.
-  std::normal_distribution<double> noise_imu_gyro_{0.0, 0.01}; // Mean 0, StdDev 0.01 rad/s.
-  std::normal_distribution<double> noise_baro_{0.0, 2.0};      // Mean 0, StdDev 2.0 Pa.
-  std::normal_distribution<double> noise_gps_{0.0, 2.5};       // Mean 0, StdDev 2.5 meters.
+  std::normal_distribution<double> noise_imu_acc_{0.0, 0.2};
+  std::normal_distribution<double> noise_imu_gyro_{0.0, 0.01};
+  std::normal_distribution<double> noise_baro_{0.0, 2.0};
+  std::normal_distribution<double> noise_gps_{0.0, 2.5};
 
   // Helper to write a specific sensor struct to the file.
   template <typename T>

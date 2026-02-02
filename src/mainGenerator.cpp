@@ -6,7 +6,7 @@ int main()
   std::cout << "Starting Simulation..." << std::endl;
 
   DataGenerator::Config config;
-  config.duration_sec = 15.0;
+  config.duration_sec = 300.0;
   config.output_filename = "flight_data.bin";
 
   DataGenerator sim(config);

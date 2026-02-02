@@ -4,6 +4,7 @@
 #include <vector>
 #include "SensorData.hpp"
 
+// Class to handle data ingestion from binary files.
 class DataIngestion
 {
 public:

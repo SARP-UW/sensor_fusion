@@ -3,77 +3,50 @@
 #include <vector>
 #include <cstdint>
 
-// Base Measurement: All sensors share these common traits.
+// Base Measurement.
 struct SensorMeasurement
 {
-  // Monotonic timestamp in seconds.
-  double timestamp_sec;
-
-  // ID to distinguish redundant sensors.
-  uint8_t sensor_id;
+  double timestamp_sec = 0.0;
+  uint8_t sensor_id = 0;
 };
 
 // Inertial Measurement Unit (IMU).
 struct ImuMeasurement : public SensorMeasurement
 {
-  // Accelerations in m/s^2.
-  double acc_x;
-  double acc_y;
-  double acc_z;
-
-  // Angular Rates in rad/s.
-  double gyro_x;
-  double gyro_y;
-  double gyro_z;
+  double acc_x = 0.0; double acc_y = 0.0; double acc_z = 0.0;
+  double gyro_x = 0.0; double gyro_y = 0.0; double gyro_z = 0.0;
 };
 
 // Barometer.
 struct BaroMeasurement : public SensorMeasurement
 {
-  // Pressure in Pascals.
-  double pressure_Pa;
-
-  // Altitude in meters.
-  double altitude_m;
-
-  // Internal Temperature in Celsius.
-  double temperature_C;
+  double pressure_Pa = 0.0;
+  double altitude_m = 0.0;
+  double temperature_C = 0.0;
 };
 
 // GPS / GNSS.
 struct GpsMeasurement : public SensorMeasurement
 {
-  // Latitude and Longitude in decimal degrees.
-  double latitude_deg;
-  double longitude_deg;
-
-  // Altitude in meters.
-  double altitude_m;
-
-  // Ground speed in m/s.
-  double ground_speed_ms;
-
-  // Number of satellites in view.
-  uint8_t num_satellites;
-
-  // Fix validity.
-  bool fix_valid;
+  double latitude_deg = 0.0; double longitude_deg = 0.0;
+  double altitude_m = 0.0;
+  double ground_speed_ms = 0.0;
+  uint8_t num_satellites = 0;
+  bool fix_valid = false;
 };
 
 // Magnetometer.
 struct MagMeasurement : public SensorMeasurement
 {
-  // Magnetic field strength in micro-Tesla (uT).
-  double mag_x;
-  double mag_y;
-  double mag_z;
+  double mag_x = 0.0;
+  double mag_y = 0.0;
+  double mag_z = 0.0;
 };
 
 // External Temperature.
 struct TempMeasurement : public SensorMeasurement
 {
-  // Temperature in Celsius.
-  double temperature_C;
+  double temperature_C = 0.0;
 };
 
 // Container for a complete flight log.
