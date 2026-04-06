@@ -6,22 +6,16 @@
 #include "DataIngestion.hpp"
 #include "Ekf.hpp"
 
-// Structure for merging sensor data by timestamp.
 struct SensorEvent
 {
-  // Timestamp of the event.
   double timestamp;
-
-  // Sensor type: 0=IMU, 1=Baro, 2=GPS, 3=Mag.
   int type;
 
-  // Pointers to the data.
   const ImuMeasurement *imu = nullptr;
   const BaroMeasurement *baro = nullptr;
   const GpsMeasurement *gps = nullptr;
   const MagMeasurement *mag = nullptr;
 
-  // Comparator for sorting by timestamp.
   bool operator<(const SensorEvent &other) const
   {
     return timestamp < other.timestamp;
@@ -30,7 +24,6 @@ struct SensorEvent
 
 int main()
 {
-  // Load the Data.
   std::string input_file = "flight_data.bin";
   std::cout << "Loading " << input_file << "..." << std::endl;
 
@@ -43,7 +36,6 @@ int main()
     return 1;
   }
 
-  // Merge and sort the data.
   std::vector<SensorEvent> timeline;
 
   for (const auto &imu : data.imu_data)
@@ -85,11 +77,9 @@ int main()
   std::sort(timeline.begin(), timeline.end());
   std::cout << "Processing " << timeline.size() << " events..." << std::endl;
 
-  // Setup output file for logging.
   std::ofstream out_file("trajectory.csv");
-  out_file << "time,pos_x,pos_y,pos_z,vel_z,quat_w,quat_x,quat_y,quat_z\n"; // Header
+  out_file << "time,pos_x,pos_y,pos_z,vel_z,quat_w,quat_x,quat_y,quat_z\n";
 
-  // Run the EKF.
   Ekf filter;
 
   for (const auto &event : timeline)
@@ -111,7 +101,6 @@ int main()
       filter.updateMag(*event.mag);
     }
 
-    // Log the state after every step.
     Eigen::Vector3d pos = filter.getPosition();
     Eigen::Vector3d vel = filter.getVelocity();
     Eigen::Quaterniond q = filter.getOrientation();

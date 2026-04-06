@@ -2,7 +2,6 @@
 #include <iostream>
 #include <fstream>
 
-// Packet Headers to identify data in the file.
 const uint8_t ID_IMU = 0x10;
 const uint8_t ID_BARO = 0x20;
 const uint8_t ID_GPS = 0x30;
@@ -12,7 +11,6 @@ ParsedData DataIngestion::loadFromFile(const std::string &filepath)
 {
   ParsedData data;
 
-  // Open input file.
   std::ifstream file(filepath, std::ios::binary);
   if (!file.is_open())
   {
@@ -21,13 +19,10 @@ ParsedData DataIngestion::loadFromFile(const std::string &filepath)
   }
   std::cout << "Parsing file: " << filepath << "..." << std::endl;
 
-  // Read packets one by one.
   uint8_t packet_header;
 
-  // Parse until end of file.
   while (file.read(reinterpret_cast<char *>(&packet_header), sizeof(packet_header)))
   {
-    // Check which packet type we found.
     if (packet_header == ID_IMU)
     {
       ImuMeasurement imu;
@@ -62,13 +57,11 @@ ParsedData DataIngestion::loadFromFile(const std::string &filepath)
     }
     else
     {
-      // Unknown packet type - possibly corrupted file.
       std::cerr << "Unknown Packet Header: " << (int)packet_header << " at position " << file.tellg() << std::endl;
       break;
     }
   }
 
-  // Close the file.
   file.close();
   std::cout << "Parsing Complete." << std::endl;
   std::cout << "Loaded " << data.imu_data.size() << " IMU packets." << std::endl;

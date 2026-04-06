@@ -2,21 +2,6 @@
 #include <iostream>
 #include <cmath>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-// Helper to check for NaNs
-bool hasNaN(const Eigen::VectorXd &x)
-{
-  for (int i = 0; i < x.size(); ++i)
-  {
-    if (std::isnan(x(i)))
-      return true;
-  }
-  return false;
-}
-
 Ekf::Ekf()
 {
   x_ = Eigen::VectorXd::Zero(STATE_DIM);
@@ -29,9 +14,9 @@ Ekf::Ekf()
   last_timestamp_sec_ = 0.0;
   initialized_ = false;
   origin_set_ = false;
-  lat_origin_ = 0;
-  lon_origin_ = 0;
-  alt_origin_ = 0;
+  lat_origin_ = 0.0;
+  lon_origin_ = 0.0;
+  alt_origin_ = 0.0;
 
   std::cout << "EKF Initialized." << std::endl;
 }
@@ -44,24 +29,27 @@ void Ekf::predict(const ImuMeasurement &imu)
     initialized_ = true;
     return;
   }
+
   double dt = imu.timestamp_sec - last_timestamp_sec_;
   last_timestamp_sec_ = imu.timestamp_sec;
-  if (dt <= 0)
+
+  if (dt <= 0.0)
     return;
+  if (dt > 0.5)
+    dt = 0.5;
 
-  // --- 1. STATE PREDICTION ---
-  Eigen::Vector3d pos = getPosition();
-  Eigen::Vector3d vel = getVelocity();
-  Eigen::Quaterniond q = getOrientation();
+  const Eigen::Vector3d pos = getPosition();
+  const Eigen::Vector3d vel = getVelocity();
+  const Eigen::Quaterniond q = getOrientation();
 
-  // Orientation
-  Eigen::Vector3d omega(imu.gyro_x, imu.gyro_y, imu.gyro_z);
+  const double qw = q.w(), qx = q.x(), qy = q.y(), qz = q.z();
+
+  const Eigen::Vector3d omega(imu.gyro_x, imu.gyro_y, imu.gyro_z);
   Eigen::Quaterniond q_dot;
-  q_dot.w() = 0;
+  q_dot.w() = 0.0;
   q_dot.vec() = omega;
-  Eigen::Vector4d q_new_coeffs = q.coeffs() + (0.5 * dt) * (q * q_dot).coeffs();
   Eigen::Quaterniond q_new;
-  q_new.coeffs() = q_new_coeffs;
+  q_new.coeffs() = q.coeffs() + (0.5 * dt) * (q * q_dot).coeffs();
   q_new.normalize();
 
   x_(6) = q_new.w();
@@ -69,65 +57,104 @@ void Ekf::predict(const ImuMeasurement &imu)
   x_(8) = q_new.y();
   x_(9) = q_new.z();
 
-  // Position/Velocity
-  Eigen::Vector3d acc_body(imu.acc_x, imu.acc_y, imu.acc_z);
-  Eigen::Vector3d acc_world = q_new * acc_body;
-  Eigen::Vector3d gravity(0, 0, 9.81);
-  Eigen::Vector3d acc_net = acc_world - gravity;
+  const Eigen::Vector3d acc_body(imu.acc_x, imu.acc_y, imu.acc_z);
+  const double bx = acc_body.x(), by = acc_body.y(), bz = acc_body.z();
 
-  Eigen::Vector3d vel_new = vel + (acc_net * dt);
-  x_.segment<3>(3) = vel_new;
+  const Eigen::Vector3d acc_world = q_new * acc_body;
+  const Eigen::Vector3d gravity(0.0, 0.0, 9.81);
+  const Eigen::Vector3d acc_net = acc_world - gravity;
 
-  Eigen::Vector3d pos_new = pos + (vel * dt) + (0.5 * acc_net * dt * dt);
-  x_.segment<3>(0) = pos_new;
+  x_.segment<3>(3) = vel + acc_net * dt;
+  x_.segment<3>(0) = pos + vel * dt + 0.5 * acc_net * (dt * dt);
 
-  // --- 2. COVARIANCE  ---
-  // P = F * P * F^t + Q
-
-  // F (State Transition Matrix) approx
   Eigen::MatrixXd F = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
+
   F(0, 3) = dt;
   F(1, 4) = dt;
-  F(2, 5) = dt; // Pos depends on Vel
+  F(2, 5) = dt;
 
-  // Q (Process Noise)
+  Eigen::MatrixXd J_acc_q(3, 4);
+
+  J_acc_q(0, 0) = -2 * qz * by + 2 * qy * bz;
+  J_acc_q(0, 1) = 2 * qy * by + 2 * qz * bz;
+  J_acc_q(0, 2) = -4 * qy * bx + 2 * qx * by + 2 * qw * bz;
+  J_acc_q(0, 3) = -4 * qz * bx - 2 * qw * by + 2 * qx * bz;
+
+  J_acc_q(1, 0) = 2 * qz * bx - 2 * qx * bz;
+  J_acc_q(1, 1) = 2 * qy * bx - 4 * qx * by - 2 * qw * bz;
+  J_acc_q(1, 2) = 2 * qx * bx + 2 * qz * bz;
+  J_acc_q(1, 3) = 2 * qw * bx - 4 * qz * by + 2 * qy * bz;
+
+  J_acc_q(2, 0) = -2 * qy * bx + 2 * qx * by;
+  J_acc_q(2, 1) = 2 * qz * bx + 2 * qw * by - 4 * qx * bz;
+  J_acc_q(2, 2) = -2 * qw * bx + 2 * qz * by - 4 * qy * bz;
+  J_acc_q(2, 3) = 2 * qx * bx + 2 * qy * by;
+
+  F.block<3, 4>(3, 6) = dt * J_acc_q;
+  F.block<3, 4>(0, 6) = 0.5 * dt * dt * J_acc_q;
+
+  const double omx = omega.x(), omy = omega.y(), omz = omega.z();
+  Eigen::Matrix4d Omega;
+  Omega << 0, -omx, -omy, -omz,
+      omx, 0, omz, -omy,
+      omy, -omz, 0, omx,
+      omz, omy, -omx, 0;
+  F.block<4, 4>(6, 6) = Eigen::Matrix4d::Identity() + 0.5 * dt * Omega;
+
   Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(STATE_DIM, STATE_DIM);
-  double q_pos = 0.0001;
-  double q_vel = 0.01;
-  double q_att = 0.001;
+  Q.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * 0.0001;
+  Q.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * 0.01;
+  Q.block<4, 4>(6, 6) = Eigen::Matrix4d::Identity() * 0.001;
 
-  Q.block<3, 3>(0, 0) = Eigen::MatrixXd::Identity(3, 3) * q_pos;
-  Q.block<3, 3>(3, 3) = Eigen::MatrixXd::Identity(3, 3) * q_vel;
-  Q.block<4, 4>(6, 6) = Eigen::MatrixXd::Identity(4, 4) * q_att;
+  P_ = F * P_ * F.transpose() + Q;
 
-  P_ = (F * P_ * F.transpose()) + Q;
+  const Eigen::Vector4d q_vec(q_new.w(), q_new.x(), q_new.y(), q_new.z());
+  const Eigen::Matrix4d J_norm = Eigen::Matrix4d::Identity() - q_vec * q_vec.transpose();
+
+  P_.block<4, 4>(6, 6) = J_norm * P_.block<4, 4>(6, 6) * J_norm.transpose();
+  const Eigen::Matrix<double, 4, 6> cross = J_norm * P_.block<4, 6>(6, 0);
+  P_.block<4, 6>(6, 0) = cross;
+  P_.block<6, 4>(0, 6) = cross.transpose();
+}
+
+static void renormalizeQuat(Eigen::VectorXd &x)
+{
+  Eigen::Quaterniond q(x(6), x(7), x(8), x(9));
+  q.normalize();
+  x(6) = q.w();
+  x(7) = q.x();
+  x(8) = q.y();
+  x(9) = q.z();
 }
 
 void Ekf::updateBaro(const BaroMeasurement &baro)
 {
-  if (std::isnan(baro.pressure_Pa) || std::isnan(baro.altitude_m))
-    return;
-  if (baro.pressure_Pa <= 0.0)
+  if (std::isnan(baro.pressure_Pa) || baro.pressure_Pa <= 0.0)
     return;
 
-  double P0 = 101325.0;
-  double measured_alt = 44330.0 * (1.0 - std::pow(baro.pressure_Pa / P0, 1.0 / 5.255));
-
-  Eigen::MatrixXd R(1, 1);
-  R << 4.0;
+  const double P0 = 101325.0;
+  const double measured_alt = 44330.0 * (1.0 - std::pow(baro.pressure_Pa / P0, 1.0 / 5.255));
 
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, STATE_DIM);
   H(0, 2) = 1.0;
 
+  Eigen::MatrixXd R(1, 1);
+  R << 4.0;
+
   Eigen::VectorXd z(1);
   z << measured_alt;
-  Eigen::VectorXd y = z - (H * x_);
-  Eigen::MatrixXd S = (H * P_ * H.transpose()) + R;
-  Eigen::MatrixXd K = P_ * H.transpose() * S.inverse();
+  const Eigen::VectorXd y = z - H * x_;
 
-  x_ = x_ + (K * y);
-  Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
-  P_ = (I - (K * H)) * P_;
+  const Eigen::MatrixXd S = H * P_ * H.transpose() + R;
+  const Eigen::MatrixXd K = (S.ldlt().solve(H * P_)).transpose();
+
+  x_ = x_ + K * y;
+
+  renormalizeQuat(x_);
+
+  const Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
+  const Eigen::MatrixXd IKH = I - K * H;
+  P_ = IKH * P_ * IKH.transpose() + K * R * K.transpose();
 }
 
 void Ekf::updateGps(const GpsMeasurement &gps)
@@ -147,32 +174,32 @@ void Ekf::updateGps(const GpsMeasurement &gps)
     return;
   }
 
-  double deg_to_rad = M_PI / 180.0;
-  double d_lat = gps.latitude_deg - lat_origin_;
-  double d_lon = gps.longitude_deg - lon_origin_;
-  double pos_x = d_lat * 111132.0;
-  double pos_y = d_lon * 111132.0 * std::cos(lat_origin_ * deg_to_rad);
-  double pos_z = gps.altitude_m - alt_origin_;
-
-  Eigen::MatrixXd R = Eigen::MatrixXd::Identity(3, 3);
-  R(0, 0) = 6.25;
-  R(1, 1) = 6.25;
-  R(2, 2) = 6.25;
+  const double deg_to_rad = M_PI / 180.0;
+  const double pos_x = (gps.latitude_deg - lat_origin_) * 111132.0;
+  const double pos_y = (gps.longitude_deg - lon_origin_) * 111132.0 * std::cos(lat_origin_ * deg_to_rad);
+  const double pos_z = gps.altitude_m - alt_origin_;
 
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3, STATE_DIM);
   H(0, 0) = 1.0;
   H(1, 1) = 1.0;
   H(2, 2) = 1.0;
 
+  const Eigen::MatrixXd R = Eigen::MatrixXd::Identity(3, 3) * 6.25;
+
   Eigen::VectorXd z(3);
   z << pos_x, pos_y, pos_z;
-  Eigen::VectorXd y = z - x_.segment<3>(0);
-  Eigen::MatrixXd S = (H * P_ * H.transpose()) + R;
-  Eigen::MatrixXd K = P_ * H.transpose() * S.inverse();
+  const Eigen::VectorXd y = z - x_.segment<3>(0);
 
-  x_ = x_ + (K * y);
-  Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
-  P_ = (I - (K * H)) * P_;
+  const Eigen::MatrixXd S = H * P_ * H.transpose() + R;
+  const Eigen::MatrixXd K = (S.ldlt().solve(H * P_)).transpose();
+
+  x_ = x_ + K * y;
+
+  renormalizeQuat(x_);
+
+  const Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
+  const Eigen::MatrixXd IKH = I - K * H;
+  P_ = IKH * P_ * IKH.transpose() + K * R * K.transpose();
 }
 
 void Ekf::updateMag(const MagMeasurement &mag)
@@ -180,15 +207,17 @@ void Ekf::updateMag(const MagMeasurement &mag)
   if (std::isnan(mag.mag_x))
     return;
 
-  double yaw_measured = std::atan2(mag.mag_y, mag.mag_x);
+  const double yaw_measured = std::atan2(mag.mag_y, mag.mag_x);
 
-  double qw = x_(6);
-  double qx = x_(7);
-  double qy = x_(8);
-  double qz = x_(9);
-  double y_part = 2.0 * (qw * qz + qx * qy);
-  double x_part = 1.0 - 2.0 * (qy * qy + qz * qz);
-  double yaw_predicted = std::atan2(y_part, x_part);
+  const double qw = x_(6), qx = x_(7), qy = x_(8), qz = x_(9);
+  const double y_part = 2.0 * (qw * qz + qx * qy);
+  const double x_part = 1.0 - 2.0 * (qy * qy + qz * qz);
+
+  const double norm_sq = y_part * y_part + x_part * x_part;
+  if (norm_sq < 1e-6)
+    return;
+
+  const double yaw_predicted = std::atan2(y_part, x_part);
 
   double innovation = yaw_measured - yaw_predicted;
   while (innovation > M_PI)
@@ -196,44 +225,29 @@ void Ekf::updateMag(const MagMeasurement &mag)
   while (innovation < -M_PI)
     innovation += 2.0 * M_PI;
 
+  const double d_atan = 1.0 / norm_sq;
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, STATE_DIM);
-  double norm_sq = y_part * y_part + x_part * x_part;
-  if (norm_sq < 1e-6)
-    return;
-  double d_atan = 1.0 / norm_sq;
-
-  double dt1_dw = 2.0 * qz;
-  double dt1_dx = 2.0 * qy;
-  double dt1_dy = 2.0 * qx;
-  double dt1_dz = 2.0 * qw;
-  double dt2_dw = 0.0;
-  double dt2_dx = 0.0;
-  double dt2_dy = -4.0 * qy;
-  double dt2_dz = -4.0 * qz;
-
-  H(0, 6) = d_atan * (x_part * dt1_dw - y_part * dt2_dw);
-  H(0, 7) = d_atan * (x_part * dt1_dx - y_part * dt2_dx);
-  H(0, 8) = d_atan * (x_part * dt1_dy - y_part * dt2_dy);
-  H(0, 9) = d_atan * (x_part * dt1_dz - y_part * dt2_dz);
+  H(0, 6) = d_atan * x_part * 2.0 * qz;
+  H(0, 7) = d_atan * x_part * 2.0 * qy;
+  H(0, 8) = d_atan * (x_part * 2.0 * qx + y_part * 4.0 * qy);
+  H(0, 9) = d_atan * (x_part * 2.0 * qw + y_part * 4.0 * qz);
 
   Eigen::MatrixXd R(1, 1);
   R << 0.1;
+
   Eigen::VectorXd z(1);
   z << innovation;
-  Eigen::MatrixXd S = (H * P_ * H.transpose()) + R;
-  Eigen::MatrixXd K = P_ * H.transpose() * S.inverse();
 
-  x_ = x_ + (K * z);
+  const Eigen::MatrixXd S = H * P_ * H.transpose() + R;
+  const Eigen::MatrixXd K = (S.ldlt().solve(H * P_)).transpose();
 
-  Eigen::Quaterniond q_updated(x_(6), x_(7), x_(8), x_(9));
-  q_updated.normalize();
-  x_(6) = q_updated.w();
-  x_(7) = q_updated.x();
-  x_(8) = q_updated.y();
-  x_(9) = q_updated.z();
+  x_ = x_ + K * z;
 
-  Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
-  P_ = (I - (K * H)) * P_;
+  renormalizeQuat(x_);
+
+  const Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
+  const Eigen::MatrixXd IKH = I - K * H;
+  P_ = IKH * P_ * IKH.transpose() + K * R * K.transpose();
 }
 
 Eigen::Vector3d Ekf::getPosition() const { return x_.segment<3>(0); }
