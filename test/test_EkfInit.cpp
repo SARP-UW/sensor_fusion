@@ -53,8 +53,8 @@ TEST(EkfInitTest, PhaseIsPreLaunchAtInit)
 TEST(EkfInitTest, CovarianceHasCorrectDimension)
 {
   Ekf filter;
-  EXPECT_EQ(filter.getCovariance().rows(), 16);
-  EXPECT_EQ(filter.getCovariance().cols(), 16);
+  EXPECT_EQ(filter.getCovariance().rows(), 15);
+  EXPECT_EQ(filter.getCovariance().cols(), 15);
 }
 
 TEST(EkfInitTest, CovarianceIsSymmetric)

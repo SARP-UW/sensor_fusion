@@ -27,14 +27,13 @@ public:
   Eigen::MatrixXd getCovariance() const { return P_; }
 
 private:
-  static const int STATE_DIM = 16;
+  static const int NOM_DIM = 16;
+  static const int ERR_DIM = 15;
 
   Eigen::VectorXd x_;
-
   Eigen::MatrixXd P_;
 
   double last_timestamp_sec_;
-
   bool initialized_;
 
   bool origin_set_;
@@ -44,5 +43,10 @@ private:
 
   FlightPhaseEstimator phase_estimator_;
 
+  void updateWithMeasurement(const Eigen::VectorXd &innovation,
+                             const Eigen::MatrixXd &H,
+                             const Eigen::MatrixXd &R);
   Eigen::MatrixXd getProcessNoise(FlightPhase phase) const;
+
+  void applyCorrection(const Eigen::VectorXd &dx);
 };

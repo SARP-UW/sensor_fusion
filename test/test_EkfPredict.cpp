@@ -63,7 +63,7 @@ TEST(EkfPredictTest, LargeDtIsClamped)
 TEST(EkfPredictTest, GravityOnlyAccelProducesZeroNetAcceleration)
 {
   Ekf filter;
-  filter.predict(makeImu(0.0, 0, 0, 9.81)); // init
+  filter.predict(makeImu(0.0, 0, 0, 9.81));
   for (int i = 1; i <= 100; ++i)
   {
     filter.predict(makeImu(i * 0.01, 0, 0, 9.81));

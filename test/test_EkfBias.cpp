@@ -64,12 +64,12 @@ TEST(EkfBiasTest, BiasCovarianceBlocksArePositiveDefinite)
   Ekf filter;
   Eigen::MatrixXd P = filter.getCovariance();
 
-  Eigen::Matrix3d P_bg = P.block<3, 3>(10, 10);
+  Eigen::Matrix3d P_bg = P.block<3, 3>(9, 9);
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> s_bg(P_bg);
   EXPECT_GT(s_bg.eigenvalues().minCoeff(), 0.0)
       << "Gyro bias covariance block is not positive definite.";
 
-  Eigen::Matrix3d P_ba = P.block<3, 3>(13, 13);
+  Eigen::Matrix3d P_ba = P.block<3, 3>(12, 12);
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> s_ba(P_ba);
   EXPECT_GT(s_ba.eigenvalues().minCoeff(), 0.0)
       << "Accel bias covariance block is not positive definite.";
@@ -104,7 +104,7 @@ TEST(EkfBiasTest, BiasEstimatesDoNotExplodeWithNoBiasInjected)
 
 TEST(EkfBiasTest, AccelBiasZMovesPosInDirectionOfInjectedBias)
 {
-  const double injected_bias_z = 1.0; // m/s²
+  const double injected_bias_z = 1.0;
 
   Ekf filter;
   filter.predict(makeImu(0.0, 0, 0, 9.81 + injected_bias_z));
@@ -183,7 +183,7 @@ TEST(EkfBiasTest, GyroBiasZMovesPosInDirectionOfInjectedBias)
 
   Ekf filter;
   filter.predict(makeImu(0.0, horizontal_acc, 0, 29.81, 0, 0, injected_bg_z));
-  filter.updateGps(makeGps(0.01, kHomeLat, kHomeLon, kHomeAlt)); // set origin
+  filter.updateGps(makeGps(0.01, kHomeLat, kHomeLon, kHomeAlt));
 
   for (int i = 1; i <= 500; ++i)
   {
@@ -191,7 +191,14 @@ TEST(EkfBiasTest, GyroBiasZMovesPosInDirectionOfInjectedBias)
     filter.predict(makeImu(t, horizontal_acc, 0, 29.81, 0, 0, injected_bg_z));
 
     if (i % 20 == 0)
-      filter.updateGps(makeGps(t, kHomeLat, kHomeLon, kHomeAlt));
+    {
+      double true_pos_x = 0.5 * horizontal_acc * t * t;
+
+      const double m_per_deg = 111132.0;
+      double current_lat = kHomeLat + (true_pos_x / m_per_deg);
+
+      filter.updateGps(makeGps(t, current_lat, kHomeLon, kHomeAlt));
+    }
   }
 
   EXPECT_GT(filter.getGyroBias().z(), 0.0)
