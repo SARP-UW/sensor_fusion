@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include "SensorData.hpp"
+#include "FlightPhase.hpp"
 
 class Ekf
 {
@@ -18,10 +19,15 @@ public:
   Eigen::Vector3d getVelocity() const;
   Eigen::Quaterniond getOrientation() const;
 
+  Eigen::Vector3d getGyroBias() const;
+  Eigen::Vector3d getAccelBias() const;
+
+  FlightPhase getPhase() const;
+
   Eigen::MatrixXd getCovariance() const { return P_; }
 
 private:
-  static const int STATE_DIM = 10;
+  static const int STATE_DIM = 16;
 
   Eigen::VectorXd x_;
 
@@ -35,4 +41,8 @@ private:
   double lat_origin_;
   double lon_origin_;
   double alt_origin_;
+
+  FlightPhaseEstimator phase_estimator_;
+
+  Eigen::MatrixXd getProcessNoise(FlightPhase phase) const;
 };

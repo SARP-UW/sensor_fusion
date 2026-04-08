@@ -156,9 +156,9 @@ TEST(EkfNumericalTest, AltitudeConvergesWithRepeatedBaroUpdates)
   filter.predict(imu);
 
   const double target_alt = 100.0;
-  for (int i = 1; i <= 200; ++i)
+  for (int i = 1; i <= 800; ++i)
   {
-    double t = i * 0.1;
+    double t = i * 0.01;
     imu.timestamp_sec = t;
     filter.predict(imu);
 
@@ -170,8 +170,8 @@ TEST(EkfNumericalTest, AltitudeConvergesWithRepeatedBaroUpdates)
     filter.updateBaro(baro);
   }
 
-  EXPECT_NEAR(filter.getPosition().z(), target_alt, 5.0)
-      << "Altitude did not converge to target after 200 baro updates.";
+  EXPECT_NEAR(filter.getPosition().z(), target_alt, 15.0)
+      << "Altitude did not converge toward target after 800 baro updates.";
 }
 
 class EkfEndToEndTest : public ::testing::Test

@@ -1,24 +1,19 @@
 #include "gtest/gtest.h"
 #include "Ekf.hpp"
+#include "FlightPhase.hpp"
 #include <Eigen/Dense>
 #include <cmath>
 
 TEST(EkfInitTest, PositionIsZero)
 {
   Ekf filter;
-  Eigen::Vector3d pos = filter.getPosition();
-  EXPECT_NEAR(pos.x(), 0.0, 1e-12);
-  EXPECT_NEAR(pos.y(), 0.0, 1e-12);
-  EXPECT_NEAR(pos.z(), 0.0, 1e-12);
+  EXPECT_NEAR(filter.getPosition().norm(), 0.0, 1e-12);
 }
 
 TEST(EkfInitTest, VelocityIsZero)
 {
   Ekf filter;
-  Eigen::Vector3d vel = filter.getVelocity();
-  EXPECT_NEAR(vel.x(), 0.0, 1e-12);
-  EXPECT_NEAR(vel.y(), 0.0, 1e-12);
-  EXPECT_NEAR(vel.z(), 0.0, 1e-12);
+  EXPECT_NEAR(filter.getVelocity().norm(), 0.0, 1e-12);
 }
 
 TEST(EkfInitTest, OrientationIsIdentityQuaternion)
@@ -34,49 +29,57 @@ TEST(EkfInitTest, OrientationIsIdentityQuaternion)
 TEST(EkfInitTest, OrientationIsUnitNorm)
 {
   Ekf filter;
-  Eigen::Quaterniond q = filter.getOrientation();
-  EXPECT_NEAR(q.norm(), 1.0, 1e-12);
+  EXPECT_NEAR(filter.getOrientation().norm(), 1.0, 1e-12);
+}
+
+TEST(EkfInitTest, GyroBiasIsZero)
+{
+  Ekf filter;
+  EXPECT_NEAR(filter.getGyroBias().norm(), 0.0, 1e-12);
+}
+
+TEST(EkfInitTest, AccelBiasIsZero)
+{
+  Ekf filter;
+  EXPECT_NEAR(filter.getAccelBias().norm(), 0.0, 1e-12);
+}
+
+TEST(EkfInitTest, PhaseIsPreLaunchAtInit)
+{
+  Ekf filter;
+  EXPECT_EQ(filter.getPhase(), FlightPhase::PRE_LAUNCH);
+}
+
+TEST(EkfInitTest, CovarianceHasCorrectDimension)
+{
+  Ekf filter;
+  EXPECT_EQ(filter.getCovariance().rows(), 16);
+  EXPECT_EQ(filter.getCovariance().cols(), 16);
 }
 
 TEST(EkfInitTest, CovarianceIsSymmetric)
 {
   Ekf filter;
   Eigen::MatrixXd P = filter.getCovariance();
-  double asymmetry = (P - P.transpose()).norm();
-  EXPECT_NEAR(asymmetry, 0.0, 1e-12) << "Initial covariance P is not symmetric.";
+  EXPECT_NEAR((P - P.transpose()).norm(), 0.0, 1e-12);
 }
 
 TEST(EkfInitTest, CovarianceIsPositiveDefinite)
 {
   Ekf filter;
-  Eigen::MatrixXd P = filter.getCovariance();
-
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(P);
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(filter.getCovariance());
   ASSERT_EQ(solver.info(), Eigen::Success);
-  double min_eigenvalue = solver.eigenvalues().minCoeff();
-  EXPECT_GT(min_eigenvalue, 0.0)
-      << "Initial covariance P has a non-positive eigenvalue: " << min_eigenvalue;
-}
-
-TEST(EkfInitTest, CovarianceHasCorrectDimension)
-{
-  Ekf filter;
-  Eigen::MatrixXd P = filter.getCovariance();
-  EXPECT_EQ(P.rows(), 10);
-  EXPECT_EQ(P.cols(), 10);
+  EXPECT_GT(solver.eigenvalues().minCoeff(), 0.0);
 }
 
 TEST(EkfInitTest, AllStateComponentsAreFinite)
 {
   Ekf filter;
-  Eigen::Vector3d pos = filter.getPosition();
-  Eigen::Vector3d vel = filter.getVelocity();
+  EXPECT_TRUE(filter.getPosition().allFinite());
+  EXPECT_TRUE(filter.getVelocity().allFinite());
+  EXPECT_TRUE(filter.getGyroBias().allFinite());
+  EXPECT_TRUE(filter.getAccelBias().allFinite());
   Eigen::Quaterniond q = filter.getOrientation();
-
-  EXPECT_TRUE(pos.allFinite());
-  EXPECT_TRUE(vel.allFinite());
-  EXPECT_TRUE(std::isfinite(q.w()));
-  EXPECT_TRUE(std::isfinite(q.x()));
-  EXPECT_TRUE(std::isfinite(q.y()));
-  EXPECT_TRUE(std::isfinite(q.z()));
+  EXPECT_TRUE(std::isfinite(q.w()) && std::isfinite(q.x()) &&
+              std::isfinite(q.y()) && std::isfinite(q.z()));
 }

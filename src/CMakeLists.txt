@@ -2,7 +2,7 @@
 # Application Library (fusion_lib) #
 ####################################
 
-add_library(fusion_lib DataIngestion.cpp Ekf.cpp)
+add_library(fusion_lib DataIngestion.cpp Ekf.cpp FlightPhase.cpp)
 target_link_libraries(fusion_lib PUBLIC Eigen3::Eigen)
 target_include_directories(fusion_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
