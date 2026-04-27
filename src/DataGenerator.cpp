@@ -110,10 +110,9 @@ void DataGenerator::generate()
       MagMeasurement mag;
       mag.timestamp_sec = t;
       mag.sensor_id = 0;
-      std::normal_distribution<double> noise_mag(0.0, 0.5);
-      mag.mag_x = 20.0 + noise_mag(generator_);
-      mag.mag_y = 0.0 + noise_mag(generator_);
-      mag.mag_z = 40.0 + noise_mag(generator_);
+      mag.mag_x = 20.0 + noise_mag_(generator_);
+      mag.mag_y = 0.0 + noise_mag_(generator_);
+      mag.mag_z = 40.0 + noise_mag_(generator_);
       writePacket(file, ID_MAG, mag);
     }
   }

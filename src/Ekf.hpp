@@ -36,6 +36,12 @@ private:
   double last_timestamp_sec_;
   bool initialized_;
 
+  static const int GPS_ORIGIN_SAMPLES = 10;
+  int gps_init_count_ = 0;
+  double lat_accum_ = 0.0;
+  double lon_accum_ = 0.0;
+  double alt_accum_ = 0.0;
+
   bool origin_set_;
   double lat_origin_;
   double lon_origin_;

@@ -58,9 +58,9 @@ Eigen::MatrixXd Ekf::getProcessNoise(FlightPhase phase) const
   case FlightPhase::BOOST:
     q_pos = 1e-4;
     q_vel = 0.1;
-    q_att = 1e-3;
+    q_att = 5e-4;
     q_bg = 1e-7;
-    q_ba = 1e-5;
+    q_ba = 1e-7;
     break;
   case FlightPhase::COAST:
     q_pos = 1e-5;
@@ -88,7 +88,7 @@ Eigen::MatrixXd Ekf::getProcessNoise(FlightPhase phase) const
     q_vel = 0.01;
     q_att = 1e-3;
     q_bg = 1e-7;
-    q_ba = 1e-6;
+    q_ba = 1e-7;
     break;
   }
 
@@ -215,7 +215,7 @@ void Ekf::updateBaro(const BaroMeasurement &baro)
   H(0, 2) = 1.0;
 
   Eigen::MatrixXd R(1, 1);
-  R << 4.0;
+  R << 1.0;
 
   const Eigen::VectorXd y = (Eigen::VectorXd(1) << measured_alt - x_(2)).finished();
   updateWithMeasurement(y, H, R);
@@ -230,11 +230,20 @@ void Ekf::updateGps(const GpsMeasurement &gps)
 
   if (!origin_set_)
   {
-    lat_origin_ = gps.latitude_deg;
-    lon_origin_ = gps.longitude_deg;
-    alt_origin_ = gps.altitude_m;
+    lat_accum_ += gps.latitude_deg;
+    lon_accum_ += gps.longitude_deg;
+    alt_accum_ += gps.altitude_m;
+    ++gps_init_count_;
+
+    if (gps_init_count_ < GPS_ORIGIN_SAMPLES)
+      return;
+
+    lat_origin_ = lat_accum_ / GPS_ORIGIN_SAMPLES;
+    lon_origin_ = lon_accum_ / GPS_ORIGIN_SAMPLES;
+    alt_origin_ = alt_accum_ / GPS_ORIGIN_SAMPLES;
     origin_set_ = true;
-    std::cout << "GPS Origin Set." << std::endl;
+    std::cout << "GPS Origin Set (averaged over "
+              << GPS_ORIGIN_SAMPLES << " packets)." << std::endl;
     return;
   }
 

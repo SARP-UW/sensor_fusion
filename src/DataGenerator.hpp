@@ -28,6 +28,7 @@ private:
   std::normal_distribution<double> noise_imu_gyro_{0.0, 0.01};
   std::normal_distribution<double> noise_baro_{0.0, 2.0};
   std::normal_distribution<double> noise_gps_{0.0, 2.5};
+  std::normal_distribution<double> noise_mag_{0.0, 0.5};
 
   template <typename T>
   void writePacket(std::ofstream &file, uint8_t packet_type, const T &data);
